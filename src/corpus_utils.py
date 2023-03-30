@@ -1,13 +1,17 @@
 import os
 import pandas as pd
 import sys
+import random
 
 from tqdm import tqdm
 
 
-def read_corpus(corpus_path: str) -> pd.DataFrame:
+def read_corpus(corpus_path: str, num_examples: int = -1) -> pd.DataFrame:
     docs_names = os.listdir(corpus_path)
     txt_files = [d for d in docs_names if d.endswith('.txt')]
+    if num_examples > -1:
+        random.shuffle(txt_files)
+        txt_files = txt_files[:num_examples]
     resumes = []
     labels = []
     with tqdm(total=len(txt_files), file=sys.stdout, colour='red', desc='  Loading ') as pbar:
