@@ -1,7 +1,7 @@
 import os
 import json
 import matplotlib.pyplot as plt
-
+import numpy as np
 from corpus_utils import read_corpus
 from nlp_utils import preprocessing
 from collections import Counter, OrderedDict
@@ -9,12 +9,12 @@ from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import StratifiedKFold
 from sklearn.linear_model import LogisticRegression
-# from sklearn.svm import SVC
-# from sklearn.tree import DecisionTreeClassifier
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
-# from sklearn.neighbors import KNeighborsClassifier
-# from xgboost import XGBClassifier
-# from lightgbm import LGBMClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from xgboost import XGBClassifier
+from lightgbm import LGBMClassifier
 # from catboost import CatBoostClassifier
 from sklearn.base import clone
 from sklearn.metrics import classification_report, ConfusionMatrixDisplay
@@ -22,21 +22,21 @@ from sklearn.metrics import classification_report, ConfusionMatrixDisplay
 
 if __name__ == '__main__':
 
-    corpus_path = 'D:\\Hilario\\Pesquisa\\Experimentos\\Renato\\corpus\\resumes_corpus'
+    # vectorizer_opt = 'binary'
+    # vectorizer_opt = 'count'
+    vectorizer_opt = 'tf_idf'
 
-    results_dir = '../data/results'
+    corpus_path = 'E:\\Renato\\Mestrado\\dissertacao_v2\\resumes_corpus'
+
+    results_dir = f'E:\\Renato\\Mestrado\\dissertacao_v2\\data\\results\\{vectorizer_opt}'
 
     os.makedirs(results_dir, exist_ok=True)
 
-    n_splits = 10
+    n_splits = 5
 
-    n_total = 100
+    n_total = 1000
 
     max_features = None
-
-    vectorizer_opt = 'binary'
-    # vectorizer_opt = 'count'
-    # vectorizer_opt = 'tf_idf'
 
     print('\nLoading Corpus\n')
 
@@ -80,25 +80,42 @@ if __name__ == '__main__':
     X_resumes = vectorizer.fit_transform(resumes).toarray()
     y_labels = label_encoder.fit_transform(labels)
 
+    y_true = label_encoder.inverse_transform(y_labels)
+
+    # print(labels)
+    # print(y_labels)
+    # print(y_true)
+
+
+
     print('\nExample Encoded:')
     print(f'  Resume: {X_resumes[-1]}')
     print(f'  Label: {y_labels[-1]}')
 
     classifiers = {
         'LogisticRegression': LogisticRegression(class_weight='balanced', max_iter=1000),
-        # 'KNN': KNeighborsClassifier(weights='uniform'),
-        # 'DecisionTree': DecisionTreeClassifier(class_weight='balanced'),
+        'KNN': KNeighborsClassifier(weights='uniform'),
+        'DecisionTree': DecisionTreeClassifier(class_weight='balanced'),
         'RandomForest': RandomForestClassifier(n_estimators=1000, class_weight='balanced'),
         'ExtraTreesClassifier': ExtraTreesClassifier(n_estimators=1000, class_weight='balanced'),
-        # 'xgboost': XGBClassifier(n_estimators=1000),
-        # 'lgbm': LGBMClassifier(n_estimators=1000, class_weight='balanced'),
-        # 'svc': SVC(class_weight='balanced'),
+        'xgboost': XGBClassifier(n_estimators=1000),
+        'lgbm': LGBMClassifier(n_estimators=1000, class_weight='balanced'),
+        'svc': SVC(class_weight='balanced'),
         # 'CatBoostClassifier': CatBoostClassifier(n_estimators=1000, verbose=False)
     }
-
+   
     print('\n\n------------Evaluations------------\n')
 
     for clf_name, clf_base in classifiers.items():
+
+        results = {
+        
+        'all_accuracy': [],
+        'all_macro_precision': [],
+        'all_macro_recall': [],
+        'all_macro_f1': [],
+        
+        }
 
         print(f'\n  Classifier: {clf_name}')
 
@@ -122,14 +139,31 @@ if __name__ == '__main__':
             all_y_test.extend(y_test)
             all_y_pred.extend(y_pred)
 
-        clf_report_dict = classification_report(all_y_test, all_y_pred, zero_division=0, output_dict=True)
+            report = classification_report(y_test, y_pred, output_dict=True)
+            
+            results['all_accuracy'].append(report['accuracy'])
+            results['all_macro_precision'].append(report['macro avg']['precision'])
+            results['all_macro_recall'].append(report['macro avg']['recall'])
+            results['all_macro_f1'].append(report['macro avg']['f1-score'])
+
+        results['mean_accuracy'] = np.mean(results['all_accuracy'])
+        results['std_accuracy'] = np.std(results['all_accuracy'])
+
+        results['mean_macro_precision'] = np.mean(results['all_macro_precision'])
+        results['std_macro_precision'] = np.std(results['all_macro_precision'])
+
+        results['mean_macro_recall'] = np.mean(results['all_macro_recall'])
+        results['std_macro_recall'] = np.std(results['all_macro_recall'])
+
+        results['mean_macro_f1'] = np.mean(results['all_macro_f1'])
+        results['std_macro_f1'] = np.std(results['all_macro_f1'])
 
         classification_report_file_name = f'{clf_name}_clf_report.json'.lower()
 
         classification_report_file_path = os.path.join(results_dir, classification_report_file_name)
 
         with open(classification_report_file_path, 'w') as file:
-            json.dump(clf_report_dict, file, indent=4)
+            json.dump(results, file, indent=4)
 
         ConfusionMatrixDisplay.from_predictions(all_y_test, all_y_pred)
 
