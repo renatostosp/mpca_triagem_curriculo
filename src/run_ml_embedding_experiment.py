@@ -1,10 +1,11 @@
 import os
+import torch
 
 from corpus_utils import read_corpus
-from nlp_utils import preprocessing
+from nlp_utils import preprocessing_v2
 from collections import Counter, OrderedDict
-from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.preprocessing import LabelEncoder
+from sentence_transformers import SentenceTransformer
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
@@ -21,14 +22,9 @@ from src.evaluation_utils import compute_evaluation_measures, compute_means_std_
 
 if __name__ == '__main__':
 
-    vectorizer_opt = 'binary'
-    # vectorizer_opt = 'count'
-    # vectorizer_opt = 'tf_idf'
-
     corpus_path = '/media/hilario/Novo volume/Hilario/Pesquisa/Experimentos/renato/resumes_corpus'
 
-    results_dir = f'/media/hilario/Novo volume/Hilario/Pesquisa/Experimentos/renato/results/ml/' \
-                  f'{vectorizer_opt}'
+    results_dir = f'/media/hilario/Novo volume/Hilario/Pesquisa/Experimentos/renato/results/ml/embeddings'
 
     os.makedirs(results_dir, exist_ok=True)
 
@@ -44,7 +40,7 @@ if __name__ == '__main__':
 
     print('\nPreProcessing Corpus\n')
 
-    corpus_df['resume_nlp'] = corpus_df['resume'].apply(lambda t: preprocessing(t)).astype(str)
+    corpus_df['resume_nlp'] = corpus_df['resume'].apply(lambda t: preprocessing_v2(t)).astype(str)
     corpus_df['label_unique'] = corpus_df['label'].apply(lambda l: l[0]).astype(str)
 
     resumes = corpus_df['resume_nlp'].values
@@ -62,20 +58,22 @@ if __name__ == '__main__':
 
     print(f'\nLabels distribution: {labels_distribution}')
 
-    vectorizer = None
-
-    if vectorizer_opt == 'tf_idf':
-        vectorizer = TfidfVectorizer(ngram_range=(1, 1), max_features=max_features)
-    elif vectorizer_opt == 'count':
-        vectorizer = CountVectorizer(ngram_range=(1, 1), binary=False, max_features=max_features)
-    else:
-        vectorizer = CountVectorizer(ngram_range=(1, 1), binary=True, max_features=max_features)
-
     label_encoder = LabelEncoder()
 
-    print(f'\nVectorizer Option: {vectorizer_opt}')
-
     y_labels = label_encoder.fit_transform(labels)
+
+    device = ('cuda' if torch.cuda.is_available() else 'cpu')
+
+    print(f'\nDevice: {device}')
+
+    model = SentenceTransformer(model_name_or_path='all-MiniLM-L6-v2', device=device)
+
+    resumes_embeddings = model.encode(resumes)
+
+    print('\nExample:')
+    print(f'  Resume: {resumes[-1]}')
+    print(f'  Resume Embedding: {resumes_embeddings[-1]}')
+    print(f'  Label: {labels[-1]}')
 
     classifiers = {
         'logistic_regression': LogisticRegression(class_weight='balanced'),
@@ -115,14 +113,11 @@ if __name__ == '__main__':
 
             classifier = clone(clf_base)
 
-            X_train = [resume for i, resume in enumerate(resumes) if i in train_idx]
-            X_test = [resume for i, resume in enumerate(resumes) if i in test_idx]
+            X_train = resumes_embeddings[train_idx]
+            X_test = resumes_embeddings[test_idx]
 
             y_train = y_labels[train_idx]
             y_test = y_labels[test_idx]
-
-            X_train = vectorizer.fit_transform(X_train).toarray()
-            X_test = vectorizer.transform(X_test).toarray()
 
             X_train, _, y_train, _ = train_test_split(
                 X_train, y_train, test_size=0.1, stratify=y_train, shuffle=True, random_state=42)
@@ -139,5 +134,3 @@ if __name__ == '__main__':
             compute_evaluation_measures(y_test, y_pred, results_dict)
 
         compute_means_std_eval_measures(clf_name, all_y_test, all_y_pred, results_dict, results_dir)
-
-        break

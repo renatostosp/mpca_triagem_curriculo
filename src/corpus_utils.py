@@ -18,9 +18,9 @@ def read_corpus(corpus_path: str, num_examples: int = -1) -> pd.DataFrame:
         for txt_file_name in txt_files:
             txt_file_path = os.path.join(corpus_path, txt_file_name)
             lab_file_path = os.path.join(corpus_path, txt_file_name.replace('.txt', '.lab'))
-            with open(txt_file_path, 'r') as file:
+            with open(txt_file_path, 'r', encoding='latin1') as file:
                 txt_content = file.read().strip()
-            with open(lab_file_path, 'r') as file:
+            with open(lab_file_path, 'r', encoding='latin1') as file:
                 labels_content = file.read().lower().strip().split()
             if len(labels_content) > 0:
                 resumes.append(txt_content)

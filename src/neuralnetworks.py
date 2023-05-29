@@ -117,4 +117,8 @@ class CNN(BuildModel):
         return self.model.predict(X_test, batch_size=16, verbose=1)
     
     def evaluateModel(self, X_test,y_test):
+<<<<<<< HEAD
         return self.model.evaluate(X_test, y_test, batch_size=16, verbose=1)
+=======
+        return self.model.evaluate(X_test, y_test, batch_size=16, verbose=1)
+>>>>>>> 17e6ca196b201d1a7cfcb32cf5790b470b379dda
