@@ -21,7 +21,7 @@ if __name__ == '__main__':
 
     corpus_path = '/media/hilario/Novo volume/Hilario/Pesquisa/Experimentos/renato/resumes_corpus'
 
-    n_total = 1000
+    n_total = -1
 
     model_name = 'distil_bert_base'
     # model_name = 'bert_base'
@@ -46,14 +46,14 @@ if __name__ == '__main__':
     fp16 = False
     optim = 'adamw_torch'
 
+    if model_name in ['bert_large', 'deberta_large', 'roberta_large']:
+        fp16 = True
+        batch_size = 4
+
     results_dir = f'/media/hilario/Novo volume/Hilario/Pesquisa/Experimentos/renato/results/bert/' \
                   f'{model_name}/{num_epochs}'
 
     os.makedirs(results_dir, exist_ok=True)
-
-    if model_name in ['bert_large', 'deberta_large', 'roberta_large']:
-        fp16 = True
-        batch_size = 4
 
     print('\nLoading Corpus\n')
 
@@ -84,6 +84,8 @@ if __name__ == '__main__':
     label_encoder = LabelEncoder()
 
     y_labels = label_encoder.fit_transform(labels)
+
+    print(f'\nLabels Mappings: {label_encoder.feature_names_in_}')
 
     device = ('cuda' if torch.cuda.is_available() else 'cpu')
 
