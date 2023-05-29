@@ -25,10 +25,9 @@ if __name__ == '__main__':
     # vectorizer_opt = 'count'
     # vectorizer_opt = 'tf_idf'
 
-    corpus_path = '/media/hilario/Novo volume/Hilario/Pesquisa/Experimentos/renato/resumes_corpus'
+    corpus_path = '../resumes_corpus'
 
-    results_dir = f'/media/hilario/Novo volume/Hilario/Pesquisa/Experimentos/renato/results/ml/' \
-                  f'{vectorizer_opt}'
+    results_dir = f'../results/ml/{vectorizer_opt}'
 
     os.makedirs(results_dir, exist_ok=True)
 
@@ -77,8 +76,10 @@ if __name__ == '__main__':
 
     y_labels = label_encoder.fit_transform(labels)
 
+    print(f'\nLabels Mappings: {label_encoder.classes_}')
+
     classifiers = {
-        'logistic_regression': LogisticRegression(class_weight='balanced'),
+        'logistic_regression': LogisticRegression(class_weight='balanced', max_iter=500),
         'knn': KNeighborsClassifier(),
         'decision_tree': DecisionTreeClassifier(class_weight='balanced'),
         'random_forest': RandomForestClassifier(class_weight='balanced'),
@@ -127,7 +128,7 @@ if __name__ == '__main__':
             X_train, _, y_train, _ = train_test_split(
                 X_train, y_train, test_size=0.1, stratify=y_train, shuffle=True, random_state=42)
 
-            print(f'\n  Folder {k + 1} - {len(X_train)} - {len(X_test)}')
+            print(f'\n    Folder {k + 1} - {len(X_train)} - {len(X_test)}')
 
             classifier.fit(X_train, y_train)
 
@@ -139,5 +140,3 @@ if __name__ == '__main__':
             compute_evaluation_measures(y_test, y_pred, results_dict)
 
         compute_means_std_eval_measures(clf_name, all_y_test, all_y_pred, results_dict, results_dir)
-
-        break

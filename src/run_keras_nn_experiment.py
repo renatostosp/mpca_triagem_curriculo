@@ -9,8 +9,7 @@ from sklearn.model_selection import StratifiedKFold, train_test_split
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
-from src.keras_models_helper import build_feed_foward, build_feed_foward_emb, build_cnn_model, \
-    build_bilstm
+from src.keras_models_helper import build_feed_foward, build_feed_foward_emb, build_cnn_model, build_lstm
 from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow import keras
 from src.evaluation_utils import compute_evaluation_measures, compute_means_std_eval_measures
@@ -18,16 +17,18 @@ from src.evaluation_utils import compute_evaluation_measures, compute_means_std_
 
 if __name__ == '__main__':
 
-    corpus_path = '/media/hilario/Novo volume/Hilario/Pesquisa/Experimentos/renato/resumes_corpus'
+    corpus_path = '../resumes_corpus'
 
-    n_total = 1000
+    n_total = 200
 
     n_splits = 5
 
-    model_name = 'feed_foward'
+    # model_name = 'feed_foward'
     # model_name = 'feed_foward_emb'
     # model_name = 'cnn'
-    # model_name = 'bilsm'
+    model_name = 'lsm'
+
+    results_dir = f'../results/nn/{model_name}'
 
     num_epochs = 1
 
@@ -36,10 +37,7 @@ if __name__ == '__main__':
     vocab_size = 1000
     emb_dim = 100
 
-    results_dir = f'/media/hilario/Novo volume/Hilario/Pesquisa/Experimentos/renato/results/keras/' \
-                  f'{model_name}'
-
-    checkpoint_dir = '/media/hilario/Novo volume/Hilario/Pesquisa/Experimentos/renato/checkpoints'
+    checkpoint_dir = '../checkpoints/'
 
     os.makedirs(results_dir, exist_ok=True)
     os.makedirs(checkpoint_dir, exist_ok=True)
@@ -68,11 +66,13 @@ if __name__ == '__main__':
 
     labels_distribution = OrderedDict(sorted(counter_labels.items()))
 
-    print(f'\nLabels distribution: {labels_distribution}')
+    print(f'\nLabels Distribution: {labels_distribution}')
 
     label_encoder = LabelEncoder()
 
     y_labels = label_encoder.fit_transform(labels)
+
+    print(f'\nLabels Mapping: {label_encoder.classes_}')
 
     print(f'\nModel Name: {model_name}')
 
@@ -132,20 +132,22 @@ if __name__ == '__main__':
         elif model_name == 'cnn':
             model = build_cnn_model(vocab_size, max_len, num_classes, emb_dim, num_filters=16,
                                     kernel_size=3)
-        elif model_name == 'bilsm':
-            model = build_bilstm(vocab_size, max_len, num_classes, emb_dim)
+        elif model_name == 'lsm':
+            model = build_lstm(vocab_size, max_len, num_classes, emb_dim)
 
-        model_checkpoint = ModelCheckpoint(filepath=checkpoint_dir, save_weights_only=True,
-                                           monitor='val_accuracy', mode='max',save_best_only=True)
+        model_checkpoint = ModelCheckpoint(filepath=checkpoint_dir, save_weights_only=True, monitor='val_accuracy',
+                                           mode='max',save_best_only=True)
 
-        history = model.fit(X_train, y_train, batch_size=batch_size, epochs=num_epochs,
-                            validation_data=(X_val, y_val), callbacks=[model_checkpoint])
+        history = model.fit(X_train, y_train, batch_size=batch_size, epochs=num_epochs, validation_data=(X_val, y_val),
+                            callbacks=[model_checkpoint])
 
         model.load_weights(checkpoint_dir)
 
         y_pred = model.predict(X_test)
 
         y_pred = np.argmax(y_pred, axis=1)
+
+        y_pred = [y for y in y_pred]
 
         all_y_test.extend(y_test)
         all_y_pred.extend(y_pred)

@@ -31,11 +31,11 @@ def build_cnn_model(vocab_size: int, max_len: int, num_classes: int, emb_dim: in
     return model
 
 
-def build_bilstm(vocab_size: int, max_len: int, num_classes: int, emb_dim: int) -> models.Sequential:
+def build_lstm(vocab_size: int, max_len: int, num_classes: int, emb_dim: int) -> models.Sequential:
     model = models.Sequential()
     model.add(layers.Embedding(input_dim=vocab_size, output_dim=emb_dim, input_length=max_len))
     model.add(layers.Dropout(rate=0.5))
-    model.add(layers.Bidirectional(layers.LSTM(units=128)))
+    model.add(layers.LSTM(units=128))
     model.add(layers.Dropout(rate=0.5))
     model.add(layers.Dense(units=64, activation='relu'))
     model.add(layers.Dense(units=num_classes, activation='sigmoid'))
