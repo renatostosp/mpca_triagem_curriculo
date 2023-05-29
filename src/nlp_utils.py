@@ -9,6 +9,7 @@ nlp = spacy.load('en_core_web_sm', disable=['ner', 'textcat'])
 def preprocessing(resume_txt: str) -> str:
     new_resume_txt = re.sub(r'<.*?>', '', resume_txt)
     new_resume_txt = re.sub(r'\s+', ' ', new_resume_txt)
+    new_resume_txt = re.sub(r'https?://\w+', '', new_resume_txt)
     new_resume_txt = new_resume_txt.replace('\n', ' ')
     new_resume_txt = unidecode.unidecode(new_resume_txt)
     doc = nlp(new_resume_txt)
@@ -23,3 +24,4 @@ def preprocessing_v2(resume_txt: str) -> str:
     new_resume_txt = new_resume_txt.replace('\n', ' ')
     new_resume_txt = unidecode.unidecode(new_resume_txt)
     return new_resume_txt.lower()
+    

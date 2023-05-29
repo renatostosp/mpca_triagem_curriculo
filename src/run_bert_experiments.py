@@ -7,8 +7,10 @@ from corpus_utils import read_corpus
 from nlp_utils import preprocessing_v2
 from collections import Counter, OrderedDict
 from sklearn.preprocessing import LabelEncoder
-from transformers import DistilBertTokenizer, BertTokenizer, BertForSequenceClassification, \
-    DistilBertForSequenceClassification, TrainingArguments, Trainer, EarlyStoppingCallback
+from transformers import DistilBertTokenizer, AlbertTokenizer, BertTokenizer, RobertaTokenizer, DebertaTokenizer
+from transformers import BertForSequenceClassification, AlbertForSequenceClassification, DistilBertForSequenceClassification, \
+    RobertaForSequenceClassification, DebertaForSequenceClassification
+from transformers import TrainingArguments, Trainer, EarlyStoppingCallback
 from sklearn.model_selection import StratifiedKFold, train_test_split
 from datasets import Dataset
 from bert_helper import tokenize_resume, compute_metrics_classification
@@ -17,13 +19,19 @@ from src.evaluation_utils import compute_evaluation_measures, compute_means_std_
 
 if __name__ == '__main__':
 
-    corpus_path = '/media/hilario/Novo volume/Hilario/Pesquisa/Experimentos/renato/resumes_corpus'
+    corpus_path = '../resumes_corpus'
 
-    n_total = -1
+    n_total = 200
 
-    model_name = 'distil_bert_base'
+    # model_name = 'distil_bert_base'
+    model_name = 'albert_base'
+    # model_name = 'albert_large'
     # model_name = 'bert_base'
     # model_name = 'bert_large'
+    # model_name = 'roberta_base'
+    # model_name = 'roberta_large'
+    # model_name = 'deberta_base'
+    # model_name = 'deberta_large'
 
     num_epochs = 1
     # num_epochs = 5
@@ -40,14 +48,13 @@ if __name__ == '__main__':
     fp16 = False
     optim = 'adamw_torch'
 
-    results_dir = f'/media/hilario/Novo volume/Hilario/Pesquisa/Experimentos/renato/results/bert/' \
-                  f'{model_name}/{num_epochs}'
-
-    os.makedirs(results_dir, exist_ok=True)
-
-    if model_name == 'bert_large':
+    if model_name in ['bert_large', 'deberta_large', 'roberta_large']:
         fp16 = True
         batch_size = 4
+
+    results_dir = f'../results/bert/{model_name}/{num_epochs}'
+
+    os.makedirs(results_dir, exist_ok=True)
 
     print('\nLoading Corpus\n')
 
@@ -79,6 +86,8 @@ if __name__ == '__main__':
 
     y_labels = label_encoder.fit_transform(labels)
 
+    print(f'\nLabels Mappings: {label_encoder.classes_}')
+
     device = ('cuda' if torch.cuda.is_available() else 'cpu')
 
     print(f'\nDevice: {device}')
@@ -87,22 +96,43 @@ if __name__ == '__main__':
 
     model_path = None
 
-    if model_name == 'bert_base':
+    if model_name == 'distil_bert_base':
+        model_path = 'distilbert-base-uncased'
+    elif model_name == 'albert_base':
+        model_path = 'albert-base-v2'
+    elif model_name == 'albert_large':
+        model_path = 'albert-large-v2'
+    elif model_name == 'bert_base':
         model_path = 'bert-base-uncased'
     elif model_name == 'bert_large':
         model_path = 'bert-large-uncased'
-    elif model_name == 'distil_bert_base':
-        model_path = 'distilbert-base-uncased'
+    elif model_name == 'roberta_base':
+        model_path = 'roberta-base'
+    elif model_name == 'roberta_large':
+        model_path = 'roberta-large'
+    elif model_name == 'deberta_base':
+        model_path = 'microsoft/deberta-base'
+    elif model_name == 'deberta_large':
+        model_path = 'microsoft/deberta-large'
     else:
         print('ERROR. Model Name Invalid!')
         exit(-1)
 
     print(f'\nConfigurations: {num_epochs} -- {batch_size}')
 
-    if model_name in ['bert_base', 'bert_large']:
-        tokenizer = BertTokenizer.from_pretrained(model_path)
-    elif model_name == 'distil_bert_base':
+    if model_name == 'distil_bert_base':
         tokenizer = DistilBertTokenizer.from_pretrained(model_path)
+    elif model_name in ['albert_base', 'albert_large']:
+        tokenizer = AlbertTokenizer.from_pretrained(model_path)
+    elif model_name in ['bert_base', 'bert_large']:
+        tokenizer = BertTokenizer.from_pretrained(model_path)
+    elif model_name in ['roberta_base', 'roberta_large']:
+        tokenizer = RobertaTokenizer.from_pretrained(model_path)
+    elif model_name in ['deberta_base', 'deberta_large']:
+        tokenizer = DebertaTokenizer.from_pretrained(model_path)
+    else:
+        print('ERROR. Model Name Invalid!')
+        exit(-1)
 
     print('\n\n------------Evaluations------------\n')
 
@@ -157,16 +187,24 @@ if __name__ == '__main__':
 
         model = None
 
-        if model_name in ['bert_base', 'bert_large']:
+        if model_name == 'distil_bert_base':
+            model = DistilBertForSequenceClassification.from_pretrained(model_path,
+                                                                        num_labels=num_classes)
+        elif model_name in ['bert_base', 'bert_large']:
             model = BertForSequenceClassification.from_pretrained(model_path, num_labels=num_classes)
-        elif model_name == 'distil_bert_base':
-            model = DistilBertForSequenceClassification.from_pretrained(model_path, num_labels=num_classes)
+        elif model_name in ['albert_base', 'albert_large']:
+            model = AlbertForSequenceClassification.from_pretrained(model_path, num_labels=num_classes)
+        elif model_name in ['roberta_base', 'roberta_large']:
+            model = RobertaForSequenceClassification.from_pretrained(model_path, num_labels=num_classes)
+        elif model_name in ['deberta_base', 'deberta_large']:
+            model = DebertaForSequenceClassification.from_pretrained(model_path, num_labels=num_classes)
 
         training_args = TrainingArguments(output_dir='training', logging_strategy='epoch',
                                           gradient_accumulation_steps=gradient_accumulation_steps,
                                           gradient_checkpointing=gradient_checkpointing,
                                           fp16=fp16, optim=optim, weight_decay=0.01, eval_steps=100,
-                                          logging_steps=100, learning_rate=5e-5, evaluation_strategy='epoch',
+                                          logging_steps=100, learning_rate=5e-5,
+                                          evaluation_strategy='epoch',
                                           per_device_train_batch_size=batch_size,
                                           per_device_eval_batch_size=batch_size,
                                           num_train_epochs=num_epochs, save_total_limit=2,
@@ -175,7 +213,8 @@ if __name__ == '__main__':
                                           report_to=['none'])
 
         trainer = Trainer(model=model, args=training_args, train_dataset=encoded_train_dataset,
-                          eval_dataset=encoded_valid_dataset, compute_metrics=compute_metrics_classification,
+                          eval_dataset=encoded_valid_dataset,
+                          compute_metrics=compute_metrics_classification,
                           callbacks=[EarlyStoppingCallback(early_stopping_patience=5)])
 
         trainer.train()

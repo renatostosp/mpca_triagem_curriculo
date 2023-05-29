@@ -1,10 +1,16 @@
-from keras.models import Sequential, Model
-from keras.layers import Dense, Dropout, Activation, LSTM, Bidirectional, Embedding, Flatten, Conv1D
-from keras import Input
-from abc import ABC, abstractmethod
+# TROCAR CAMEL CASE POR SNAKE CASE: compileModel -> compile_model)
+# trocar validation_split por validation_data (veja a rede CNN)
 
+from keras.models import Sequential, Model
+from keras.layers import Dense, Dropout, Embedding, Flatten, Bidirectional, Conv1D, LSTM
+from keras.callbacks import ModelCheckpoint
+from abc import ABC, abstractmethod
+import os
 
 class BuildModel(ABC):
+    @abstractmethod
+    def __init__(self):
+        pass
 
     @abstractmethod
     def compileModel(self):
@@ -13,112 +19,130 @@ class BuildModel(ABC):
     @abstractmethod
     def fitModel(self, X_train, y_train, epochs, callbacks):
         pass
- 
+
     @abstractmethod
     def predictModel(self, X_test):
         pass
 
-class MLP(BuildModel):
+class Checkpoint:
+    def __init__(self, checkpoint_dir):
+        self.checkpoint_dir = checkpoint_dir
+        os.makedirs(self.checkpoint_dir, exist_ok=True)
 
-    def __init__(self, num_classes):
-        super().__init__()
-        self.vocab_size = 300 
-        self.embedding_dim = 100
-        self.drop_value = 0.5
-        self.n_dense = 24
-        self.model = Sequential([
-            Embedding(input_dim=self.vocab_size, output_dim=self.embedding_dim, input_length=1000),
-            Flatten(),
-            Dense(64, activation="relu"),
-            Dropout(self.drop_value),
-            Dense(64, activation="relu"),
-            Dropout(self.drop_value),
-            Dense(num_classes, activation="softmax")
-        ])
+    def get_checkpoint_callback(self):
+        return ModelCheckpoint(filepath=self.checkpoint_dir, save_weights_only=True, monitor='val_accuracy', mode='max', save_best_only=True)
+
+class FeedForward(BuildModel):
+    def __init__(self, max_len, num_classes):
+        self.model = Sequential()
+        self.model.add(Dense(units=256, input_shape=(max_len,), activation='relu'))
+        self.model.add(Dense(units=num_classes, activation='softmax'))
 
     def compileModel(self):
-        self.model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+        self.model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+        return self.model
 
-    def fitModel(self, X_train, y_train, epochs, callbacks):
-        history = self.model.fit(X_train, y_train, epochs=epochs, batch_size=32, validation_split=0.1, callbacks=callbacks)    
+    def fitModel(self, X_train, y_train, X_val, y_val, epochs, callbacks=None):
+        if callbacks is None:
+            callbacks = []
+        checkpoint = Checkpoint(f'E:\\Renato\\Mestrado\\dissertacao_v2\\resumes_corpus\\models\\{self.__class__.__name__}')  
+        checkpoint_callback = checkpoint.get_checkpoint_callback()
+        callbacks.append(checkpoint_callback)
+        self.callbacks = callbacks
+        history = self.model.fit(X_train, y_train, epochs=epochs, batch_size=32, validation_data=(X_val, y_val), callbacks=self.callbacks)
         return history
 
     def predictModel(self, X_test):
         return self.model.predict(X_test, batch_size=64, verbose=1)
+
+    def evaluateModel(self, X_test, y_test):
+        return self.model.evaluate(X_test, y_test, batch_size=64, verbose=1)
     
-    def evaluateModel(self, X_test,y_test):
-        return self.model.evaluate(X_test, y_test, batch_size=64, verbose=1)     
+class EmbFeedForward(BuildModel):
 
-class BidirectionalLSTM(BuildModel):
-
-    def __init__(self, num_classes):
-        super().__init__()
-        self.max_features = 30000
-        # inputs = Input(shape=(None,), dtype="int32")
-        # x = Embedding(num_classes, 128)(inputs)
-        # x = Bidirectional(LSTM(64, return_sequences=True))(x)
-        # x = Bidirectional(LSTM(64))(x)
-        # outputs = Dense(num_classes, activation="sigmoid")(x)
-        # self.model = Model(inputs, outputs)
-
-        self.model = Sequential([
-            Input(shape=(None,), dtype="int32"),
-            Embedding(self.max_features, 64),
-            Bidirectional(LSTM(64, return_sequences=True)),
-            Bidirectional(LSTM(64)),
-            Dropout(0.2),
-            Dense(num_classes, activation="softmax")
-        ])
+    def __init__(self, max_len, vocab_size, embedding_dim, num_classes):
+        self.model = Sequential()
+        self.model.add(Embedding(input_dim=vocab_size, output_dim=embedding_dim, input_length=max_len))
+        self.model.add(Flatten())
+        self.model.add(Dense(units=64, activation='relu'))
+        self.model.add(Dense(units=num_classes, activation='softmax'))
 
     def compileModel(self):
-        self.model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
+        self.model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+        return self.model
 
-    def fitModel(self, X_train, y_train, epochs):
-        history = self.model.fit(X_train, y_train, batch_size=16, epochs=epochs, validation_split=0.1)
+    def fitModel(self, X_train, y_train, X_val, y_val, epochs, callbacks=None):
+        if callbacks is None:
+            callbacks = []
+        checkpoint = Checkpoint(f'E:\\Renato\\Mestrado\\dissertacao_v2\\resumes_corpus\\models\\{self.__class__.__name__}')  
+        checkpoint_callback = checkpoint.get_checkpoint_callback()
+        callbacks.append(checkpoint_callback)
+        self.callbacks = callbacks
+        history = self.model.fit(X_train, y_train, epochs=epochs, batch_size=32, validation_data=(X_val, y_val), callbacks=self.callbacks)
         return history
 
     def predictModel(self, X_test):
-        return self.model.predict(X_test, batch_size=16, verbose=1)
-    
-    def evaluateModel(self, X_test,y_test):
-        return self.model.evaluate(X_test, y_test, batch_size=16, verbose=1)
+        return self.model.predict(X_test, batch_size=64, verbose=1)
+
+    def evaluateModel(self, X_test, y_test):
+        return self.model.evaluate(X_test, y_test, batch_size=64, verbose=1)
+
+
+class BidirectionalLSTM(BuildModel):
+
+    def __init__(self, max_len, vocab_size, embedding_dim, num_classes):
+        self.model = Sequential()
+        self.model.add(Embedding(input_dim=vocab_size, output_dim=embedding_dim, input_length=max_len))
+        self.model.add(Bidirectional(LSTM(32, return_sequences=True)))
+        self.model.add(Bidirectional(LSTM(32)))
+        self.model.add(Dense(units=num_classes, activation='softmax'))
+
+    def compileModel(self):
+        self.model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
+        return self.model
+
+    def fitModel(self, X_train, y_train, X_val, y_val, epochs, callbacks=None):
+        if callbacks is None:
+            callbacks = []
+        checkpoint = Checkpoint(f'E:\\Renato\\Mestrado\\dissertacao_v2\\resumes_corpus\\models\\{self.__class__.__name__}')  
+        checkpoint_callback = checkpoint.get_checkpoint_callback()
+        callbacks.append(checkpoint_callback)
+        self.callbacks = callbacks
+        history = self.model.fit(X_train, y_train, epochs=epochs, batch_size=32, validation_data=(X_val, y_val), callbacks=self.callbacks)
+        return history
+
+    def predictModel(self, X_test):
+        return self.model.predict(X_test, batch_size=64, verbose=1)
+
+    def evaluateModel(self, X_test, y_test):
+        return self.model.evaluate(X_test, y_test, batch_size=64, verbose=1)
 
 
 class CNN(BuildModel):
 
-    def __init__(self, num_classes):
-        super().__init__()
-        self.max_features = 30000
-        # inputs = Input(shape=(None,), dtype="int32")
-        # x = Embedding(num_classes, 128)(inputs)
-        # x = Bidirectional(LSTM(64, return_sequences=True))(x)
-        # x = Bidirectional(LSTM(64))(x)
-        # outputs = Dense(num_classes, activation="sigmoid")(x)
-        # self.model = Model(inputs, outputs)
-
-        self.model = Sequential([
-            Input(shape=(None,), dtype="int32"),
-            Embedding(self.max_features, 64),
-            Conv1D(40, kernel_size=(3,3), activation='relu'),
-            Bidirectional(LSTM(64, return_sequences=True)),
-            Bidirectional(LSTM(64)),
-            Dropout(0.2),
-            Dense(num_classes, activation="softmax")
-        ])
+    def __init__(self, max_len, vocab_size, embedding_dim, num_classes):
+        self.model = Sequential()
+        self.model.add(Embedding(input_dim=vocab_size, output_dim=embedding_dim, input_length=max_len))
+        self.model.add(Conv1D(40, kernel_size=(3,3), activation='relu'))
+        self.model.add(Bidirectional(LSTM(64, return_sequences=True)))
+        self.model.add(Dense(units=num_classes, activation='softmax'))
 
     def compileModel(self):
         self.model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
+        return self.model
 
-    def fitModel(self, X_train, y_train, epochs):
-        history = self.model.fit(X_train, y_train, batch_size=16, epochs=epochs, validation_split=0.1)
+    def fitModel(self, X_train, y_train, X_val, y_val, epochs, callbacks=None):
+        if callbacks is None:
+            callbacks = []
+        checkpoint = Checkpoint(f'E:\\Renato\\Mestrado\\dissertacao_v2\\resumes_corpus\\models\\{self.__class__.__name__}')  
+        checkpoint_callback = checkpoint.get_checkpoint_callback()
+        callbacks.append(checkpoint_callback)
+        self.callbacks = callbacks
+        history = self.model.fit(X_train, y_train, epochs=epochs, batch_size=32, validation_data=(X_val, y_val), callbacks=self.callbacks)
         return history
 
     def predictModel(self, X_test):
-        return self.model.predict(X_test, batch_size=16, verbose=1)
-    
-    def evaluateModel(self, X_test,y_test):
-<<<<<<< HEAD
-        return self.model.evaluate(X_test, y_test, batch_size=16, verbose=1)
-=======
-        return self.model.evaluate(X_test, y_test, batch_size=16, verbose=1)
->>>>>>> 17e6ca196b201d1a7cfcb32cf5790b470b379dda
+        return self.model.predict(X_test, batch_size=64, verbose=1)
+
+    def evaluateModel(self, X_test, y_test):
+        return self.model.evaluate(X_test, y_test, batch_size=64, verbose=1)

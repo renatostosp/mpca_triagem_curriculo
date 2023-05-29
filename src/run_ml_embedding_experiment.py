@@ -22,17 +22,15 @@ from src.evaluation_utils import compute_evaluation_measures, compute_means_std_
 
 if __name__ == '__main__':
 
-    corpus_path = '/media/hilario/Novo volume/Hilario/Pesquisa/Experimentos/renato/resumes_corpus'
+    corpus_path = '../resumes_corpus'
 
-    results_dir = f'/media/hilario/Novo volume/Hilario/Pesquisa/Experimentos/renato/results/ml/embeddings'
+    results_dir = f'../results/ml/embeddings'
 
     os.makedirs(results_dir, exist_ok=True)
 
     n_splits = 5
 
     n_total = 200
-
-    max_features = 5000
 
     print('\nLoading Corpus\n')
 
@@ -60,6 +58,8 @@ if __name__ == '__main__':
 
     label_encoder = LabelEncoder()
 
+    print(f'\nLabels Mappings: {label_encoder.classes_}')
+
     y_labels = label_encoder.fit_transform(labels)
 
     device = ('cuda' if torch.cuda.is_available() else 'cpu')
@@ -76,7 +76,7 @@ if __name__ == '__main__':
     print(f'  Label: {labels[-1]}')
 
     classifiers = {
-        'logistic_regression': LogisticRegression(class_weight='balanced'),
+        'logistic_regression': LogisticRegression(class_weight='balanced', max_iter=500),
         'knn': KNeighborsClassifier(),
         'decision_tree': DecisionTreeClassifier(class_weight='balanced'),
         'random_forest': RandomForestClassifier(class_weight='balanced'),
@@ -122,7 +122,7 @@ if __name__ == '__main__':
             X_train, _, y_train, _ = train_test_split(
                 X_train, y_train, test_size=0.1, stratify=y_train, shuffle=True, random_state=42)
 
-            print(f'\n  Folder {k + 1} - {len(X_train)} - {len(X_test)}')
+            print(f'\n    Folder {k + 1} - {len(X_train)} - {len(X_test)}')
 
             classifier.fit(X_train, y_train)
 

@@ -37,7 +37,7 @@ def compute_means_std_eval_measures(clf_name: str, all_y_test: list, all_y_pred:
     results_dict['all_y_test'] = all_y_test
     results_dict['all_y_pred'] = all_y_pred
 
-    classification_report_file_name = f'{clf_name}_clf_report.json'.lower()
+    classification_report_file_name = f'{clf_name}_report.json'.lower()
 
     classification_report_file_path = os.path.join(results_dir, classification_report_file_name)
 

@@ -131,3 +131,9 @@ dmypy.json
 .idea
 
 data/
+
+results/
+
+resumes_corpus/
+
+checkpoints/
