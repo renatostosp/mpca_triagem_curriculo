@@ -2,9 +2,8 @@ import os
 import pandas as pd
 import sys
 import random
-
+import shutil
 from tqdm import tqdm
-
 
 def read_corpus(corpus_path: str, num_examples: int = -1) -> pd.DataFrame:
     docs_names = os.listdir(corpus_path)
@@ -32,3 +31,22 @@ def read_corpus(corpus_path: str, num_examples: int = -1) -> pd.DataFrame:
     }
     corpus_df = pd.DataFrame.from_dict(corpus_dict)
     return corpus_df
+
+
+def move_empty_files(src_dir: str, dest_dir: str) -> None: 
+    # Checa os arquivos no diretório de origem e cria o destino.
+    for file in [f for f in os.listdir(src_dir) if f.endswith(".lab")]:
+        src_file_lab = os.path.join(src_dir, file)
+        dest_file_lab = os.path.join(dest_dir, file)
+
+    for file in [f for f in os.listdir(src_dir) if f.endswith(".txt")]:
+        src_file_txt = os.path.join(src_dir, file)
+        dest_file_txt = os.path.join(dest_dir, file)
+
+        # Checa se o arquivo está vazio e transfere o arquivo ".lab" ou ".txt correspondente"
+        if os.path.getsize(src_file_lab) == 0:
+            shutil.move(src_file_lab, dest_file_lab)
+            shutil.move(src_file_txt, dest_file_txt)
+        elif os.path.getsize(src_file_txt) == 0:
+            shutil.move(src_file_lab, dest_file_lab)
+            shutil.move(src_file_txt, dest_file_txt)

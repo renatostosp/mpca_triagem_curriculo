@@ -1,130 +1,165 @@
 import os
-import json
-import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+
 from corpus_utils import read_corpus
-from nlp_utils import preprocessing
+from nlp_utils import preprocessing_v2, no_spacing
 from collections import Counter, OrderedDict
 from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics import classification_report, ConfusionMatrixDisplay
+from sklearn.model_selection import StratifiedKFold, train_test_split
 from keras.utils import to_categorical, pad_sequences
-from neuralnetworks import FeedForward, EmbFeedForward, BidirectionalLSTM, CNN
 from keras.preprocessing.text import Tokenizer
+from neuralnetworks import Checkpoint, FeedForward, EmbFeedForward, BidirectionalLSTM, CNN
+from keras.callbacks import ModelCheckpoint
+from tensorflow import keras
+from evaluation_utils import compute_evaluation_measures, compute_means_std_eval_measures
+from keras.models import Sequential
+import tensorflow as tf
 
-def evaluate_model(X_resumes, y_labels, num_classes, vocab_size, embedding_dim, input_length, model, n_splits=5, callbacks=[]):
-
-    skf_outer = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
-    all_y_test = []
-    all_y_pred = []
-    results = {
-        'all_accuracy': [],
-        'all_macro_precision': [],
-        'all_macro_recall': [],
-        'all_macro_f1': []
-    }
-    
-    for train_index, test_index in skf_outer.split(X_resumes, y_labels):
-        X_train, X_test = X_resumes[train_index], X_resumes[test_index]
-        y_train, y_test = y_labels[train_index], y_labels[test_index]
-
-        skf_inner = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=52)
-        for train_inner_index, val_index in skf_inner.split(X_train, y_train):
-            X_train_split, X_val = X_train[train_inner_index], X_train[val_index]
-            y_train_split, y_val = y_train[train_inner_index], y_train[val_index]
-
-            y_train_split = to_categorical(y_train_split, num_classes)
-            y_val = to_categorical(y_val, num_classes)
-            y_test_categorical = to_categorical(y_test, num_classes)
-
-            model.compileModel()
-            model.fitModel(X_train_split, y_train_split, X_val, y_val, epochs=20)
-            y_pred = model.predictModel(X_test)
-
-            y_test_bool = np.argmax(y_test_categorical, axis=1)
-            y_pred_bool = np.argmax(y_pred, axis=1)
-            all_y_test.extend(y_test_bool)
-            all_y_pred.extend(y_pred_bool)
-            results['all_accuracy'].append(model.evaluateModel(X_test, y_test_categorical)[1])
-
-    macro_precision, macro_recall, macro_f1, _ = classification_report(all_y_test, all_y_pred, output_dict=True)['macro avg'].values()
-    results['all_macro_precision'].append(macro_precision)
-    results['all_macro_recall'].append(macro_recall)
-    results['all_macro_f1'].append(macro_f1)
-
-    return results
-
-def callClassifier(clf_name, clf_base) -> None:        
-    print(f"\n\n{clf_name}\n")
-    model = clf_base
-    results = evaluate_model(X_resumes, y_labels, num_classes, vocab_size, embedding_dim, input_length, model, n_splits=5)
-    print(results)
 
 if __name__ == '__main__':
-    vectorizer_opt = 'neural'
-    embedding_dim = 300 # tamanho do vetor de embedding de cada palavra
-    input_length = 1000 # tamanho máximo da matriz de embedding toda
 
     corpus_path = 'E:\\Renato\\Mestrado\\dissertacao_v2\\resumes_corpus'
-    results_dir = f'E:\\Renato\\Mestrado\\dissertacao_v2\\data\\results\\neuralnetworks\\{vectorizer_opt}'
-    os.makedirs(results_dir, exist_ok=True)
+
+    n_total = 600
+
     n_splits = 5
-    n_total = 50
-    max_features = None
+
+    model_name = 'feed_forward'
+    # model_name = 'feed_forward_emb'
+    # model_name = 'cnn'
+    # model_name = 'lstm'
+
+    results_dir = f'E:\\Renato\\Mestrado\\dissertacao_v2\\data\\results\\neuralnetworks\\{model_name}'
+
+    num_epochs = 5
+
+    batch_size = 64
+
+    vocab_size = 1000
+    emb_dim = 100
+
+    checkpoint_dir = f'E:\\Renato\\Mestrado\\dissertacao_v2\\mpca_triagem_curriculo\\checkpoints\\{model_name}'
+    checkpoint_path = checkpoint_dir + '\\training_1\\cp.ckpt'
+
+    os.makedirs(results_dir, exist_ok=True)
+    os.makedirs(checkpoint_dir, exist_ok=True)
+
     print('\nLoading Corpus\n')
+
     corpus_df = read_corpus(corpus_path, num_examples=n_total)
-    
-    corpus_df['resume_nlp'] = corpus_df['resume'].apply(lambda t: preprocessing(t)).astype(str)
+
+    print('\nPreProcessing Corpus\n')
+
+    corpus_df['resume_nlp'] = corpus_df['resume'].apply(lambda t: preprocessing_v2(t)).astype(str)
     corpus_df['label_unique'] = corpus_df['label'].apply(lambda l: l[0]).astype(str)
+    corpus_df['no_spacing'] = corpus_df['resume_nlp'].apply(lambda t: no_spacing(t)).astype(str)
+    corpus_df_unique = corpus_df.drop_duplicates(subset='no_spacing')
+
     resumes = corpus_df['resume_nlp'].values
     labels = corpus_df['label_unique'].values
-    if n_total > 0:
-        resumes = resumes[:n_total]
-        labels = labels[:n_total]
-    print(f'\nCorpus: {len(resumes)} -- {len(labels)}')
+
+    num_classes = len(set(labels))
+
+    print(f'\nCorpus: {len(resumes)} -- {len(labels)} -- {num_classes}')
+
     print('\nExample:')
     print(f'  Resume: {resumes[-1]}')
     print(f'  Label: {labels[-1]}')
-    
-    counter_1 = Counter(labels)
-    
-    labels_distribution = OrderedDict(sorted(counter_1.items()))
-    print(f'\nLabels distribution: {labels_distribution}')
+
+    counter_labels = Counter(labels)
+
+    labels_distribution = OrderedDict(sorted(counter_labels.items()))
+
+    print(f'\nLabels Distribution: {labels_distribution}')
+
     label_encoder = LabelEncoder()
+
     y_labels = label_encoder.fit_transform(labels)
-    
-    num_classes = len(label_encoder.classes_)
-    print(f'num classes: {num_classes}')
 
-    tokenizer = Tokenizer(oov_token='<oov>')
-    tokenizer.fit_on_texts(resumes)
-    resumes_sequences = tokenizer.texts_to_sequences(resumes)
+    print(f'\nLabels Mapping: {label_encoder.classes_}')
 
-    max_len = max([len(x) for x in resumes])
-
-    X_resumes = pad_sequences(resumes_sequences, maxlen=max_len, padding='post')
-
-    print(f'X Shape: {X_resumes.shape}')
-    print(f'Y Shape: {y_labels.shape}')
-
-    y_true = label_encoder.inverse_transform(y_labels)
-    print('\nExample Encoded:')
-    print(f'  Resume: {X_resumes[-1]}')
-    print(f'  Label: {y_labels[-1]}')
-
-    vocab_size = len(tokenizer.word_index) + 1
-    # vocab_size = 1000
-
-    print('\nVocab size:', vocab_size)
-
-    classifiers = {
-        'Feed Forward': FeedForward(num_classes=num_classes, max_len=max_len),
-        'Feed Forward with Embedding': EmbFeedForward(num_classes=num_classes, max_len=max_len, vocab_size=vocab_size, embedding_dim=embedding_dim),
-        'Bidirectional LSTM': BidirectionalLSTM(num_classes=num_classes, max_len=max_len, vocab_size=vocab_size, embedding_dim=embedding_dim),
-        'CNN': CNN(num_classes=num_classes, max_len=max_len, vocab_size=vocab_size, embedding_dim=embedding_dim)
-
-    }
+    print(f'\nModel Name: {model_name}')
 
     print('\n\n------------Evaluations------------\n')
-    for clf_name, clf_base in classifiers.items():
-        callClassifier(clf_name, clf_base)
+
+    results_dict = {
+        'all_accuracy': [],
+        'all_macro_avg_p': [],
+        'all_macro_avg_r': [],
+        'all_macro_avg_f1': [],
+        'all_weighted_avg_p': [],
+        'all_weighted_avg_r': [],
+        'all_weighted_avg_f1': []
+    }
+
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+
+    all_y_test = []
+    all_y_pred = []
+
+    for k, (train_idx, test_idx) in enumerate(skf.split(resumes, y_labels)):
+
+        X_train = [resume for i, resume in enumerate(resumes) if i in train_idx]
+        X_test = [resume for i, resume in enumerate(resumes) if i in test_idx]
+
+        y_train = y_labels[train_idx]
+        y_test = y_labels[test_idx]
+
+        X_train, X_val, y_train, y_valid = train_test_split(
+            X_train, y_train, test_size=0.1, stratify=y_train, shuffle=True, random_state=42)
+
+        print(f'\n  Folder {k + 1} - {len(X_train)} - {len(X_val)} - {len(X_test)}')
+
+        y_train = to_categorical(y_train, num_classes=num_classes)
+        y_val = to_categorical(y_valid, num_classes=num_classes)
+
+        tokenizer = Tokenizer(oov_token='<OOV>')
+
+        tokenizer.fit_on_texts(X_train)
+
+        X_train = tokenizer.texts_to_sequences(X_train)
+        X_val = tokenizer.texts_to_sequences(X_val)
+        X_test = tokenizer.texts_to_sequences(X_test)
+
+        max_len = max([len(x) for x in X_train])
+
+        X_train = pad_sequences(X_train, maxlen=max_len, padding='post')
+        X_val = pad_sequences(X_val, maxlen=max_len, padding='post')
+        X_test = pad_sequences(X_test, maxlen=max_len, padding='post')
+
+        nn_model = None
+
+        if model_name == 'feed_forward':
+            nn_model = FeedForward(max_len, num_classes)
+        elif model_name == 'feed_forward_emb':
+            nn_model = EmbFeedForward(max_len, vocab_size, emb_dim, num_classes)
+        elif model_name == 'cnn':
+            nn_model = CNN(vocab_size, max_len, num_classes, emb_dim, num_filters=16,
+                                    kernel_size=3)
+        elif model_name == 'lstm':
+            nn_model = BidirectionalLSTM(vocab_size, max_len, num_classes, emb_dim)
+
+        callback = None
+        # callback = ModelCheckpoint(filepath=checkpoint_dir, save_weights_only=True, monitor='val_accuracy',
+        #                                    mode='max',save_best_only=True)
+
+        history = nn_model.fit_model(X_train, y_train, X_val, y_val, num_epochs, batch_size, checkpoint_dir=checkpoint_dir)
+                        
+        if not nn_model.cb or isinstance(callback, ModelCheckpoint):
+            nn_model.model.load_weights(checkpoint_dir)
+
+        y_pred = nn_model.predict_model(X_test)
+
+        y_pred = np.argmax(y_pred, axis=1)
+
+        y_pred = [y for y in y_pred]
+
+        all_y_test.extend(y_test)
+        all_y_pred.extend(y_pred)
+
+        compute_evaluation_measures(y_test, y_pred, results_dict)
+
+        keras.backend.clear_session()
+
+    compute_means_std_eval_measures(model_name, all_y_test, all_y_pred, results_dict, results_dir)
