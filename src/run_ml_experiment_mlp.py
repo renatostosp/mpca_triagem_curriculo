@@ -2,7 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 
-from corpus_utils import read_corpus
+from corpus_utils import read_corpus, move_empty_files
 from nlp_utils import preprocessing_v2, no_spacing
 from collections import Counter, OrderedDict
 from sklearn.preprocessing import LabelEncoder
@@ -20,6 +20,7 @@ import tensorflow as tf
 if __name__ == '__main__':
 
     corpus_path = 'E:\\Renato\\Mestrado\\dissertacao_v2\\resumes_corpus'
+    empty_path = 'E:\\Renato\\Mestrado\\dissertacao_v2\\empty_files'
 
     n_total = 600
 
@@ -45,6 +46,10 @@ if __name__ == '__main__':
     os.makedirs(results_dir, exist_ok=True)
     os.makedirs(checkpoint_dir, exist_ok=True)
 
+    print('\nRemoving empty files\n')
+
+    move_empty_files(corpus_path, empty_path)     
+
     print('\nLoading Corpus\n')
 
     corpus_df = read_corpus(corpus_path, num_examples=n_total)
@@ -56,8 +61,8 @@ if __name__ == '__main__':
     corpus_df['no_spacing'] = corpus_df['resume_nlp'].apply(lambda t: no_spacing(t)).astype(str)
     corpus_df_unique = corpus_df.drop_duplicates(subset='no_spacing')
 
-    resumes = corpus_df['resume_nlp'].values
-    labels = corpus_df['label_unique'].values
+    resumes = corpus_df_unique['resume_nlp'].values
+    labels = corpus_df_unique['label_unique'].values
 
     num_classes = len(set(labels))
 
