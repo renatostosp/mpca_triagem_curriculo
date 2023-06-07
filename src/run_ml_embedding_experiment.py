@@ -2,7 +2,7 @@ import os
 import torch
 
 from corpus_utils import read_corpus
-from nlp_utils import preprocessing_v2
+from nlp_utils import preprocessing_v2, no_spacing
 from collections import Counter, OrderedDict
 from sklearn.preprocessing import LabelEncoder
 from sentence_transformers import SentenceTransformer
@@ -30,7 +30,7 @@ if __name__ == '__main__':
 
     n_splits = 5
 
-    n_total = 200
+    n_total = -1
 
     print('\nLoading Corpus\n')
 
@@ -40,9 +40,12 @@ if __name__ == '__main__':
 
     corpus_df['resume_nlp'] = corpus_df['resume'].apply(lambda t: preprocessing_v2(t)).astype(str)
     corpus_df['label_unique'] = corpus_df['label'].apply(lambda l: l[0]).astype(str)
+    corpus_df['no_spacing'] = corpus_df['resume_nlp'].apply(lambda t: no_spacing(t)).astype(str)
 
-    resumes = corpus_df['resume_nlp'].values
-    labels = corpus_df['label_unique'].values
+    corpus_df_unique = corpus_df.drop_duplicates(subset='no_spacing')
+
+    resumes = corpus_df_unique['resume_nlp'].values
+    labels = corpus_df_unique['label_unique'].values
 
     print(f'\nCorpus: {len(resumes)} -- {len(labels)}')
 
@@ -58,9 +61,9 @@ if __name__ == '__main__':
 
     label_encoder = LabelEncoder()
 
-    print(f'\nLabels Mappings: {label_encoder.classes_}')
-
     y_labels = label_encoder.fit_transform(labels)
+
+    print(f'\nLabels Mappings: {label_encoder.classes_}')
 
     device = ('cuda' if torch.cuda.is_available() else 'cpu')
 

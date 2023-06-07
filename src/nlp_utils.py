@@ -25,6 +25,7 @@ def preprocessing_v2(resume_txt: str) -> str:
     new_resume_txt = unidecode.unidecode(new_resume_txt)
     return new_resume_txt.lower()
 
+
 def no_spacing(resume_txt: str) -> str:
     new_resume_txt = re.sub(r'\s+', '', resume_txt)
     return new_resume_txt.lower()

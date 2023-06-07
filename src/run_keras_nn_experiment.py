@@ -18,149 +18,152 @@ from src.evaluation_utils import compute_evaluation_measures, compute_means_std_
 if __name__ == '__main__':
 
     corpus_path = '../resumes_corpus'
-    empty_path = '../empty_files'
 
-    n_total = 200
+    n_total = -1
 
     n_splits = 5
 
-    # model_name = 'feed_foward'
-    # model_name = 'feed_foward_emb'
-    # model_name = 'cnn'
-    model_name = 'lsm'
+    num_epochs = 20
 
-    results_dir = f'../results/nn/{model_name}'
-
-    num_epochs = 1
-
-    batch_size = 64
+    batch_size = 4
 
     vocab_size = 1000
     emb_dim = 100
 
     checkpoint_dir = '../checkpoints/'
 
-    os.makedirs(results_dir, exist_ok=True)
     os.makedirs(checkpoint_dir, exist_ok=True)
 
-    print('\nRemoving empty files\n')
+    # model_name = 'feed_foward'
+    # model_name = 'feed_foward_emb'
+    # model_name = 'cnn'
+    # model_name = 'lsm'
 
-    move_empty_files(corpus_path, empty_path) 
+    for model_name in ['feed_foward', 'feed_foward_emb', 'cnn', 'lsm']:
 
-    print('\nLoading Corpus\n')
+        print(f'\n\nModel Name: {model_name}\n')
 
-    corpus_df = read_corpus(corpus_path, num_examples=n_total)
+        results_dir = f'../results/nn/{model_name}_{num_epochs}'
 
-    print('\nPreProcessing Corpus\n')
+        os.makedirs(results_dir, exist_ok=True)
 
-    corpus_df['resume_nlp'] = corpus_df['resume'].apply(lambda t: preprocessing_v2(t)).astype(str)
-    corpus_df['label_unique'] = corpus_df['label'].apply(lambda l: l[0]).astype(str)
-    corpus_df['no_spacing'] = corpus_df['resume_nlp'].apply(lambda t: no_spacing(t)).astype(str)
-    corpus_df_unique = corpus_df.drop_duplicates(subset='no_spacing')
+        print('\nLoading Corpus\n')
 
-    resumes = corpus_df_unique['resume_nlp'].values
-    labels = corpus_df_unique['label_unique'].values
+        corpus_df = read_corpus(corpus_path, num_examples=n_total)
 
-    num_classes = len(set(labels))
+        print('\nPreProcessing Corpus\n')
 
-    print(f'\nCorpus: {len(resumes)} -- {len(labels)} -- {num_classes}')
+        corpus_df['resume_nlp'] = corpus_df['resume'].apply(lambda t: preprocessing_v2(t)).astype(str)
+        corpus_df['label_unique'] = corpus_df['label'].apply(lambda l: l[0]).astype(str)
+        corpus_df['no_spacing'] = corpus_df['resume_nlp'].apply(lambda t: no_spacing(t)).astype(str)
 
-    print('\nExample:')
-    print(f'  Resume: {resumes[-1]}')
-    print(f'  Label: {labels[-1]}')
+        corpus_df_unique = corpus_df.drop_duplicates(subset='no_spacing')
 
-    counter_labels = Counter(labels)
+        resumes = corpus_df_unique['resume_nlp'].values
+        labels = corpus_df_unique['label_unique'].values
 
-    labels_distribution = OrderedDict(sorted(counter_labels.items()))
+        num_classes = len(set(labels))
 
-    print(f'\nLabels Distribution: {labels_distribution}')
+        print(f'\nCorpus: {len(resumes)} -- {len(labels)} -- {num_classes}')
 
-    label_encoder = LabelEncoder()
+        print('\nExample:')
+        print(f'  Resume: {resumes[-1]}')
+        print(f'  Label: {labels[-1]}')
 
-    y_labels = label_encoder.fit_transform(labels)
+        counter_labels = Counter(labels)
 
-    print(f'\nLabels Mapping: {label_encoder.classes_}')
+        labels_distribution = OrderedDict(sorted(counter_labels.items()))
 
-    print(f'\nModel Name: {model_name}')
+        print(f'\nLabels Distribution: {labels_distribution}')
 
-    print('\n\n------------Evaluations------------\n')
+        label_encoder = LabelEncoder()
 
-    results_dict = {
-        'all_accuracy': [],
-        'all_macro_avg_p': [],
-        'all_macro_avg_r': [],
-        'all_macro_avg_f1': [],
-        'all_weighted_avg_p': [],
-        'all_weighted_avg_r': [],
-        'all_weighted_avg_f1': []
-    }
+        y_labels = label_encoder.fit_transform(labels)
 
-    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+        print(f'\nLabels Mapping: {label_encoder.classes_}')
 
-    all_y_test = []
-    all_y_pred = []
+        print('\n\n------------Evaluations------------\n')
 
-    for k, (train_idx, test_idx) in enumerate(skf.split(resumes, y_labels)):
+        results_dict = {
+            'all_accuracy': [],
+            'all_macro_avg_p': [],
+            'all_macro_avg_r': [],
+            'all_macro_avg_f1': [],
+            'all_weighted_avg_p': [],
+            'all_weighted_avg_r': [],
+            'all_weighted_avg_f1': []
+        }
 
-        X_train = [resume for i, resume in enumerate(resumes) if i in train_idx]
-        X_test = [resume for i, resume in enumerate(resumes) if i in test_idx]
+        skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
 
-        y_train = y_labels[train_idx]
-        y_test = y_labels[test_idx]
+        all_y_test = []
+        all_y_pred = []
 
-        X_train, X_val, y_train, y_valid = train_test_split(
-            X_train, y_train, test_size=0.1, stratify=y_train, shuffle=True, random_state=42)
+        for k, (train_idx, test_idx) in enumerate(skf.split(resumes, y_labels)):
 
-        print(f'\n  Folder {k + 1} - {len(X_train)} - {len(X_val)} - {len(X_test)}')
+            X_train = [resume for i, resume in enumerate(resumes) if i in train_idx]
+            X_test = [resume for i, resume in enumerate(resumes) if i in test_idx]
 
-        y_train = to_categorical(y_train, num_classes=num_classes)
-        y_val = to_categorical(y_valid, num_classes=num_classes)
+            y_train = y_labels[train_idx]
+            y_test = y_labels[test_idx]
 
-        tokenizer = Tokenizer(oov_token='<OOV>')
+            X_train, X_val, y_train, y_valid = train_test_split(
+                X_train, y_train, test_size=0.1, stratify=y_train, shuffle=True, random_state=42)
 
-        tokenizer.fit_on_texts(X_train)
+            print(f'\n  Folder {k + 1} - {len(X_train)} - {len(X_val)} - {len(X_test)}')
 
-        X_train = tokenizer.texts_to_sequences(X_train)
-        X_val = tokenizer.texts_to_sequences(X_val)
-        X_test = tokenizer.texts_to_sequences(X_test)
+            y_train = to_categorical(y_train, num_classes=num_classes)
+            y_val = to_categorical(y_valid, num_classes=num_classes)
 
-        max_len = max([len(x) for x in X_train])
+            tokenizer = Tokenizer(oov_token='<OOV>')
 
-        X_train = pad_sequences(X_train, maxlen=max_len, padding='post')
-        X_val = pad_sequences(X_val, maxlen=max_len, padding='post')
-        X_test = pad_sequences(X_test, maxlen=max_len, padding='post')
+            tokenizer.fit_on_texts(X_train)
 
-        model = None
+            X_train = tokenizer.texts_to_sequences(X_train)
+            X_val = tokenizer.texts_to_sequences(X_val)
+            X_test = tokenizer.texts_to_sequences(X_test)
 
-        if model_name == 'feed_foward':
-            model = build_feed_foward(max_len, num_classes)
-        elif model_name == 'feed_foward_emb':
-            model = build_feed_foward_emb(vocab_size, max_len, num_classes, emb_dim)
-        elif model_name == 'cnn':
-            model = build_cnn_model(vocab_size, max_len, num_classes, emb_dim, num_filters=16,
-                                    kernel_size=3)
-        elif model_name == 'lsm':
-            model = build_lstm(vocab_size, max_len, num_classes, emb_dim)
+            max_len = max([len(x) for x in X_train])
 
-        model_checkpoint = ModelCheckpoint(filepath=checkpoint_dir, save_weights_only=True, monitor='val_accuracy',
-                                           mode='max',save_best_only=True)
+            X_train = pad_sequences(X_train, maxlen=max_len, padding='post')
+            X_val = pad_sequences(X_val, maxlen=max_len, padding='post')
+            X_test = pad_sequences(X_test, maxlen=max_len, padding='post')
 
-        history = model.fit(X_train, y_train, batch_size=batch_size, epochs=num_epochs, validation_data=(X_val, y_val),
-                            callbacks=[model_checkpoint])
+            model = None
 
-        model.load_weights(checkpoint_dir)
+            if model_name == 'feed_foward':
+                model = build_feed_foward(max_len, num_classes)
+            elif model_name == 'feed_foward_emb':
+                model = build_feed_foward_emb(vocab_size, max_len, num_classes, emb_dim)
+            elif model_name == 'cnn':
+                model = build_cnn_model(vocab_size, max_len, num_classes, emb_dim, num_filters=16,
+                                        kernel_size=3)
+            elif model_name == 'lsm':
+                model = build_lstm(vocab_size, max_len, num_classes, emb_dim)
 
-        y_pred = model.predict(X_test)
+            model_checkpoint = ModelCheckpoint(filepath=checkpoint_dir, save_weights_only=True, monitor='val_accuracy',
+                                               mode='max',save_best_only=True)
 
-        y_pred = np.argmax(y_pred, axis=1)
+            history = model.fit(X_train, y_train, batch_size=batch_size, epochs=num_epochs, validation_data=(X_val, y_val),
+                                callbacks=[model_checkpoint])
 
-        y_pred = [y for y in y_pred]
+            model.load_weights(checkpoint_dir)
 
-        all_y_test.extend(y_test)
-        all_y_pred.extend(y_pred)
+            y_pred = model.predict(X_test)
 
-        compute_evaluation_measures(y_test, y_pred, results_dict)
+            y_pred = np.argmax(y_pred, axis=1)
 
-        keras.backend.clear_session()
+            y_pred = [y for y in y_pred]
 
-    compute_means_std_eval_measures(model_name, all_y_test, all_y_pred, results_dict, results_dir)
+            all_y_test.extend(y_test)
+            all_y_pred.extend(y_pred)
+
+            compute_evaluation_measures(y_test, y_pred, results_dict)
+
+            keras.backend.clear_session()
+
+        compute_means_std_eval_measures(model_name, all_y_test, all_y_pred, results_dict, results_dir)
+
+    import time
+
+    time.sleep(160)

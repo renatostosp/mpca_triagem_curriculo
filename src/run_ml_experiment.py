@@ -1,7 +1,7 @@
 import os
 
 from corpus_utils import read_corpus
-from nlp_utils import preprocessing
+from nlp_utils import preprocessing, preprocessing_v2, no_spacing
 from collections import Counter, OrderedDict
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.preprocessing import LabelEncoder
@@ -21,19 +21,15 @@ from src.evaluation_utils import compute_evaluation_measures, compute_means_std_
 
 if __name__ == '__main__':
 
-    vectorizer_opt = 'binary'
+    # vectorizer_opt = 'binary'
     # vectorizer_opt = 'count'
     # vectorizer_opt = 'tf_idf'
 
     corpus_path = '../resumes_corpus'
 
-    results_dir = f'../results/ml/{vectorizer_opt}'
-
-    os.makedirs(results_dir, exist_ok=True)
-
     n_splits = 5
 
-    n_total = 200
+    n_total = -1
 
     max_features = 5000
 
@@ -43,11 +39,16 @@ if __name__ == '__main__':
 
     print('\nPreProcessing Corpus\n')
 
-    corpus_df['resume_nlp'] = corpus_df['resume'].apply(lambda t: preprocessing(t)).astype(str)
+    corpus_df['resume_norm'] = corpus_df['resume'].apply(lambda t: preprocessing_v2(t)).astype(str)
     corpus_df['label_unique'] = corpus_df['label'].apply(lambda l: l[0]).astype(str)
+    corpus_df['no_spacing'] = corpus_df['resume_norm'].apply(lambda t: no_spacing(t)).astype(str)
 
-    resumes = corpus_df['resume_nlp'].values
-    labels = corpus_df['label_unique'].values
+    corpus_df_unique = corpus_df.drop_duplicates(subset='no_spacing')
+
+    corpus_df_unique['resume_nlp'] = corpus_df_unique['resume'].apply(lambda t: preprocessing(t)).astype(str)
+
+    resumes = corpus_df_unique['resume_nlp'].values
+    labels = corpus_df_unique['label_unique'].values
 
     print(f'\nCorpus: {len(resumes)} -- {len(labels)}')
 
@@ -61,82 +62,94 @@ if __name__ == '__main__':
 
     print(f'\nLabels distribution: {labels_distribution}')
 
-    vectorizer = None
+    for vectorizer_opt in ['binary', 'count', 'tf_idf']:
 
-    if vectorizer_opt == 'tf_idf':
-        vectorizer = TfidfVectorizer(ngram_range=(1, 1), max_features=max_features)
-    elif vectorizer_opt == 'count':
-        vectorizer = CountVectorizer(ngram_range=(1, 1), binary=False, max_features=max_features)
-    else:
-        vectorizer = CountVectorizer(ngram_range=(1, 1), binary=True, max_features=max_features)
+        print(f'\n\nVectorizer: {vectorizer_opt}\n\n')
 
-    label_encoder = LabelEncoder()
+        results_dir = f'../results/ml/{vectorizer_opt}'
 
-    print(f'\nVectorizer Option: {vectorizer_opt}')
+        os.makedirs(results_dir, exist_ok=True)
 
-    y_labels = label_encoder.fit_transform(labels)
+        vectorizer = None
 
-    print(f'\nLabels Mappings: {label_encoder.classes_}')
+        if vectorizer_opt == 'tf_idf':
+            vectorizer = TfidfVectorizer(ngram_range=(1, 1), max_features=max_features)
+        elif vectorizer_opt == 'count':
+            vectorizer = CountVectorizer(ngram_range=(1, 1), binary=False, max_features=max_features)
+        else:
+            vectorizer = CountVectorizer(ngram_range=(1, 1), binary=True, max_features=max_features)
 
-    classifiers = {
-        'logistic_regression': LogisticRegression(class_weight='balanced', max_iter=500),
-        'knn': KNeighborsClassifier(),
-        'decision_tree': DecisionTreeClassifier(class_weight='balanced'),
-        'random_forest': RandomForestClassifier(class_weight='balanced'),
-        'extra_trees_classifier': ExtraTreesClassifier(class_weight='balanced'),
-        'xgboost': XGBClassifier(),
-        'lgbm': LGBMClassifier(class_weight='balanced'),
-        'svc': SVC(class_weight='balanced'),
-        'cat_boost_classifier': CatBoostClassifier(verbose=False),
-        'mlp_classifier': MLPClassifier()
-    }
+        label_encoder = LabelEncoder()
 
-    print('\n\n------------Evaluations------------\n')
+        print(f'\nVectorizer Option: {vectorizer_opt}')
 
-    for clf_name, clf_base in classifiers.items():
+        y_labels = label_encoder.fit_transform(labels)
 
-        results_dict = {
-            'all_accuracy': [],
-            'all_macro_avg_p': [],
-            'all_macro_avg_r': [],
-            'all_macro_avg_f1': [],
-            'all_weighted_avg_p': [],
-            'all_weighted_avg_r': [],
-            'all_weighted_avg_f1': []
+        print(f'\nLabels Mappings: {label_encoder.classes_}')
+
+        classifiers = {
+            'logistic_regression': LogisticRegression(class_weight='balanced', max_iter=500),
+            'knn': KNeighborsClassifier(),
+            'decision_tree': DecisionTreeClassifier(class_weight='balanced'),
+            'random_forest': RandomForestClassifier(class_weight='balanced'),
+            'extra_trees_classifier': ExtraTreesClassifier(class_weight='balanced'),
+            'xgboost': XGBClassifier(),
+            'lgbm': LGBMClassifier(class_weight='balanced'),
+            'svc': SVC(class_weight='balanced'),
+            'cat_boost_classifier': CatBoostClassifier(verbose=False),
+            'mlp_classifier': MLPClassifier()
         }
 
-        print(f'\n  Classifier: {clf_name}')
+        print('\n\n------------Evaluations------------\n')
 
-        skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+        for clf_name, clf_base in classifiers.items():
 
-        all_y_test = []
-        all_y_pred = []
+            results_dict = {
+                'all_accuracy': [],
+                'all_macro_avg_p': [],
+                'all_macro_avg_r': [],
+                'all_macro_avg_f1': [],
+                'all_weighted_avg_p': [],
+                'all_weighted_avg_r': [],
+                'all_weighted_avg_f1': []
+            }
 
-        for k, (train_idx, test_idx) in enumerate(skf.split(resumes, y_labels)):
+            print(f'\n  Classifier: {clf_name}')
 
-            classifier = clone(clf_base)
+            skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
 
-            X_train = [resume for i, resume in enumerate(resumes) if i in train_idx]
-            X_test = [resume for i, resume in enumerate(resumes) if i in test_idx]
+            all_y_test = []
+            all_y_pred = []
 
-            y_train = y_labels[train_idx]
-            y_test = y_labels[test_idx]
+            for k, (train_idx, test_idx) in enumerate(skf.split(resumes, y_labels)):
 
-            X_train = vectorizer.fit_transform(X_train).toarray()
-            X_test = vectorizer.transform(X_test).toarray()
+                classifier = clone(clf_base)
 
-            X_train, _, y_train, _ = train_test_split(
-                X_train, y_train, test_size=0.1, stratify=y_train, shuffle=True, random_state=42)
+                X_train = [resume for i, resume in enumerate(resumes) if i in train_idx]
+                X_test = [resume for i, resume in enumerate(resumes) if i in test_idx]
 
-            print(f'\n    Folder {k + 1} - {len(X_train)} - {len(X_test)}')
+                y_train = y_labels[train_idx]
+                y_test = y_labels[test_idx]
 
-            classifier.fit(X_train, y_train)
+                X_train = vectorizer.fit_transform(X_train).toarray()
+                X_test = vectorizer.transform(X_test).toarray()
 
-            y_pred = classifier.predict(X_test)
+                X_train, _, y_train, _ = train_test_split(
+                    X_train, y_train, test_size=0.1, stratify=y_train, shuffle=True, random_state=42)
 
-            all_y_test.extend(y_test)
-            all_y_pred.extend(y_pred)
+                print(f'\n    Folder {k + 1} - {len(X_train)} - {len(X_test)}')
 
-            compute_evaluation_measures(y_test, y_pred, results_dict)
+                classifier.fit(X_train, y_train)
 
-        compute_means_std_eval_measures(clf_name, all_y_test, all_y_pred, results_dict, results_dir)
+                y_pred = classifier.predict(X_test)
+
+                all_y_test.extend(y_test)
+                all_y_pred.extend(y_pred)
+
+                compute_evaluation_measures(y_test, y_pred, results_dict)
+
+            compute_means_std_eval_measures(clf_name, all_y_test, all_y_pred, results_dict, results_dir)
+
+        import time
+
+        time.sleep(120)
