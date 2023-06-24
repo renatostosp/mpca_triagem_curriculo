@@ -41,3 +41,15 @@ def build_lstm(vocab_size: int, max_len: int, num_classes: int, emb_dim: int) ->
     model.add(layers.Dense(units=num_classes, activation='sigmoid'))
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
     return model
+
+
+def build_hybrid(vocab_size: int, max_len: int, num_classes: int, emb_dim: int) -> models.Sequential:
+    model = models.Sequential(name='CNN_with_BiLSTM')
+    model.add(layers.Embedding(vocab_size, emb_dim, input_length=max_len))
+    model.add(layers.Conv1D(16, 3, activation='relu'))
+    model.add(layers.MaxPooling1D(pool_size=4))
+    model.add(layers.Bidirectional(layers.LSTM(64)))
+    model.add(layers.Dropout(0.2))
+    model.add(layers.Dense(num_classes, activation='sigmoid'))
+    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+    return model

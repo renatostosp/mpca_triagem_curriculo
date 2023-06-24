@@ -9,7 +9,7 @@ from sklearn.model_selection import StratifiedKFold, train_test_split
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
-from src.keras_models_helper import build_feed_foward, build_feed_foward_emb, build_cnn_model, build_lstm
+from src.keras_models_helper import build_feed_foward, build_feed_foward_emb, build_cnn_model, build_lstm, build_hybrid
 from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow import keras
 from src.evaluation_utils import compute_evaluation_measures, compute_means_std_eval_measures
@@ -37,7 +37,8 @@ if __name__ == '__main__':
     # model_name = 'feed_foward'
     # model_name = 'feed_foward_emb'
     # model_name = 'cnn'
-    # model_name = 'lsm'
+    # model_name = 'lstm'
+    model_name = 'hybrid'
 
     for model_name in ['feed_foward', 'feed_foward_emb', 'cnn', 'lsm']:
 
@@ -138,8 +139,10 @@ if __name__ == '__main__':
             elif model_name == 'cnn':
                 model = build_cnn_model(vocab_size, max_len, num_classes, emb_dim, num_filters=16,
                                         kernel_size=3)
-            elif model_name == 'lsm':
+            elif model_name == 'lstm':
                 model = build_lstm(vocab_size, max_len, num_classes, emb_dim)
+            elif model_name == 'hybrid':
+                model = build_hybrid(vocab_size, max_len, num_classes, emb_dim)
 
             model_checkpoint = ModelCheckpoint(filepath=checkpoint_dir, save_weights_only=True, monitor='val_accuracy',
                                                mode='max',save_best_only=True)
