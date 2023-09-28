@@ -18,6 +18,7 @@ from src.evaluation_utils import compute_evaluation_measures, compute_means_std_
 if __name__ == '__main__':
 
     corpus_path = '../resumes_corpus'
+    empty_labels_path = '../empty_labels'
 
     n_total = -1
 
@@ -47,6 +48,10 @@ if __name__ == '__main__':
         results_dir = f'../results/nn/{model_name}_{num_epochs}'
 
         os.makedirs(results_dir, exist_ok=True)
+
+        print('\nRemoving empty files\n')
+
+        move_empty_files(corpus_path, empty_labels_path)          
 
         print('\nLoading Corpus\n')
 

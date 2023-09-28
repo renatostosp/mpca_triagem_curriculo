@@ -1,6 +1,6 @@
 import os
 
-from corpus_utils import read_corpus
+from corpus_utils import read_corpus, move_empty_files
 from nlp_utils import preprocessing, preprocessing_v2, no_spacing
 from collections import Counter, OrderedDict
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
@@ -26,12 +26,17 @@ if __name__ == '__main__':
     # vectorizer_opt = 'tf_idf'
 
     corpus_path = '../resumes_corpus'
+    empty_labels_path = '../empty_labels'
 
     n_splits = 5
 
     n_total = -1
 
     max_features = 5000
+
+    print('\nRemoving empty files\n')
+
+    move_empty_files(corpus_path, empty_labels_path)  
 
     print('\nLoading Corpus\n')
 

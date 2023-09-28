@@ -3,7 +3,7 @@ import torch
 import numpy as np
 import torch.nn.functional as f
 
-from corpus_utils import read_corpus
+from corpus_utils import read_corpus, move_empty_files
 from nlp_utils import preprocessing_v2, no_spacing
 from collections import Counter, OrderedDict
 from sklearn.preprocessing import LabelEncoder
@@ -20,6 +20,8 @@ from src.evaluation_utils import compute_evaluation_measures, compute_means_std_
 if __name__ == '__main__':
 
     corpus_path = '../resumes_corpus'
+    empty_labels_path = '../empty_labels'
+
 
     n_total = -1
 
@@ -59,6 +61,10 @@ if __name__ == '__main__':
         results_dir = f'../results/bert/{model_name}/{num_epochs}'
 
         os.makedirs(results_dir, exist_ok=True)
+
+        print('\nRemoving empty files\n')
+
+        move_empty_files(corpus_path, empty_labels_path)    
 
         print('\nLoading Corpus\n')
 
