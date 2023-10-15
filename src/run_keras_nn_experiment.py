@@ -1,7 +1,7 @@
 import os
 import numpy as np
 
-from corpus_utils import read_corpus, move_empty_files
+from corpus_utils import read_corpus
 from nlp_utils import preprocessing_v2, no_spacing
 from collections import Counter, OrderedDict
 from sklearn.preprocessing import LabelEncoder
@@ -17,8 +17,7 @@ from src.evaluation_utils import compute_evaluation_measures, compute_means_std_
 
 if __name__ == '__main__':
 
-    corpus_path = '../resumes_corpus'
-    empty_labels_path = '../empty_labels'
+    corpus_path = '/media/hilario/Novo Volume/Hilario/Pesquisa/Experimentos/renato/resumes_corpus'
 
     n_total = -1
 
@@ -31,62 +30,60 @@ if __name__ == '__main__':
     vocab_size = 1000
     emb_dim = 100
 
-    checkpoint_dir = '../checkpoints/'
+    print('\nLoading Corpus\n')
 
-    os.makedirs(checkpoint_dir, exist_ok=True)
+    corpus_df = read_corpus(corpus_path, num_examples=n_total)
 
-    # model_name = 'feed_foward'
-    # model_name = 'feed_foward_emb'
-    # model_name = 'cnn'
-    # model_name = 'lstm'
-    model_name = 'hybrid'
+    print('\nPreProcessing Corpus\n')
 
-    for model_name in ['feed_foward', 'feed_foward_emb', 'cnn', 'lsm']:
+    corpus_df['resume_nlp'] = corpus_df['resume'].apply(lambda t: preprocessing_v2(t)).astype(str)
+    corpus_df['label_unique'] = corpus_df['label'].apply(lambda l: l[0]).astype(str)
+    corpus_df['no_spacing'] = corpus_df['resume_nlp'].apply(lambda t: no_spacing(t)).astype(str)
+
+    corpus_df_unique = corpus_df.drop_duplicates(subset='no_spacing')
+
+    resumes = corpus_df_unique['resume_nlp'].values
+    labels = corpus_df_unique['label_unique'].values
+
+    num_classes = len(set(labels))
+
+    print(f'\nCorpus: {len(resumes)} -- {len(labels)} -- {num_classes}')
+
+    print('\nExample:')
+    print(f'  Resume: {resumes[-1]}')
+    print(f'  Label: {labels[-1]}')
+
+    counter_labels = Counter(labels)
+
+    labels_distribution = OrderedDict(sorted(counter_labels.items()))
+
+    print(f'\nLabels Distribution: {labels_distribution}')
+
+    label_encoder = LabelEncoder()
+
+    y_labels = label_encoder.fit_transform(labels)
+
+    print(f'\nLabels Mapping: {label_encoder.classes_}')
+
+    models_options = [
+        # 'feed_foward',
+        # 'feed_foward_emb',
+        # 'cnn',
+        # 'lstm',
+        'hybrid'
+    ]
+
+    for model_name in models_options:
 
         print(f'\n\nModel Name: {model_name}\n')
 
         results_dir = f'../results/nn/{model_name}_{num_epochs}'
 
+        checkpoint_dir = f'../checkpoints/{model_name}_{num_epochs}'
+
         os.makedirs(results_dir, exist_ok=True)
 
-        print('\nRemoving empty files\n')
-
-        move_empty_files(corpus_path, empty_labels_path)          
-
-        print('\nLoading Corpus\n')
-
-        corpus_df = read_corpus(corpus_path, num_examples=n_total)
-
-        print('\nPreProcessing Corpus\n')
-
-        corpus_df['resume_nlp'] = corpus_df['resume'].apply(lambda t: preprocessing_v2(t)).astype(str)
-        corpus_df['label_unique'] = corpus_df['label'].apply(lambda l: l[0]).astype(str)
-        corpus_df['no_spacing'] = corpus_df['resume_nlp'].apply(lambda t: no_spacing(t)).astype(str)
-
-        corpus_df_unique = corpus_df.drop_duplicates(subset='no_spacing')
-
-        resumes = corpus_df_unique['resume_nlp'].values
-        labels = corpus_df_unique['label_unique'].values
-
-        num_classes = len(set(labels))
-
-        print(f'\nCorpus: {len(resumes)} -- {len(labels)} -- {num_classes}')
-
-        print('\nExample:')
-        print(f'  Resume: {resumes[-1]}')
-        print(f'  Label: {labels[-1]}')
-
-        counter_labels = Counter(labels)
-
-        labels_distribution = OrderedDict(sorted(counter_labels.items()))
-
-        print(f'\nLabels Distribution: {labels_distribution}')
-
-        label_encoder = LabelEncoder()
-
-        y_labels = label_encoder.fit_transform(labels)
-
-        print(f'\nLabels Mapping: {label_encoder.classes_}')
+        os.makedirs(checkpoint_dir, exist_ok=True)
 
         print('\n\n------------Evaluations------------\n')
 
@@ -149,11 +146,11 @@ if __name__ == '__main__':
             elif model_name == 'hybrid':
                 model = build_hybrid(vocab_size, max_len, num_classes, emb_dim)
 
-            model_checkpoint = ModelCheckpoint(filepath=checkpoint_dir, save_weights_only=True, monitor='val_accuracy',
-                                               mode='max',save_best_only=True)
+            model_checkpoint = ModelCheckpoint(filepath=checkpoint_dir, save_weights_only=True,
+                                               monitor='val_accuracy', mode='max', save_best_only=True)
 
-            history = model.fit(X_train, y_train, batch_size=batch_size, epochs=num_epochs, validation_data=(X_val, y_val),
-                                callbacks=[model_checkpoint])
+            history = model.fit(X_train, y_train, batch_size=batch_size, epochs=num_epochs,
+                                validation_data=(X_val, y_val), callbacks=[model_checkpoint])
 
             model.load_weights(checkpoint_dir)
 
@@ -171,7 +168,3 @@ if __name__ == '__main__':
             keras.backend.clear_session()
 
         compute_means_std_eval_measures(model_name, all_y_test, all_y_pred, results_dict, results_dir)
-
-    import time
-
-    time.sleep(160)

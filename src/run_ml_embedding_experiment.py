@@ -22,10 +22,15 @@ from src.evaluation_utils import compute_evaluation_measures, compute_means_std_
 
 if __name__ == '__main__':
 
-    corpus_path = '../resumes_corpus'
-    empty_labels_path = '../empty_labels'
+    corpus_path = '/media/hilario/Novo Volume/Hilario/Pesquisa/Experimentos/renato/resumes_corpus'
+    empty_labels_path = '/media/hilario/Novo Volume/Hilario/Pesquisa/Experimentos/renato/empty_labels'
 
-    results_dir = f'../results/ml/embeddings'
+    # model_name = 'minilm'
+    model_name = 'bert_base'
+
+    print(f'\nEmbedding Model: {model_name}')
+
+    results_dir = f'../results/ml/embeddings/{model_name}'
 
     os.makedirs(results_dir, exist_ok=True)
 
@@ -70,11 +75,16 @@ if __name__ == '__main__':
 
     print(f'\nLabels Mappings: {label_encoder.classes_}')
 
-    device = ('cuda' if torch.cuda.is_available() else 'cpu')
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     print(f'\nDevice: {device}')
 
-    model = SentenceTransformer(model_name_or_path='all-MiniLM-L6-v2', device=device)
+    if model_name == 'minilm':
+        model_embedding_name = 'all-MiniLM-L6-v2'
+    else:
+        model_embedding_name = 'bert-base-uncased'
+
+    model = SentenceTransformer(model_name_or_path=model_embedding_name, device=device)
 
     resumes_embeddings = model.encode(resumes)
 

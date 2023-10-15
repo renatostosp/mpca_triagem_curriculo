@@ -5,6 +5,7 @@ import random
 import shutil
 from tqdm import tqdm
 
+
 def read_corpus(corpus_path: str, num_examples: int = -1) -> pd.DataFrame:
     docs_names = os.listdir(corpus_path)
     txt_files = [d for d in docs_names if d.endswith('.txt')]

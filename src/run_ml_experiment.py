@@ -1,4 +1,5 @@
 import os
+import time
 
 from corpus_utils import read_corpus, move_empty_files
 from nlp_utils import preprocessing, preprocessing_v2, no_spacing
@@ -21,22 +22,15 @@ from src.evaluation_utils import compute_evaluation_measures, compute_means_std_
 
 if __name__ == '__main__':
 
-    # vectorizer_opt = 'binary'
-    # vectorizer_opt = 'count'
-    # vectorizer_opt = 'tf_idf'
+    corpus_path = '/media/hilario/Novo Volume/Hilario/Pesquisa/Experimentos/renato/resumes_corpus'
 
-    corpus_path = '../resumes_corpus'
-    empty_labels_path = '../empty_labels'
+    vectorizer_options = ['tf_idf']
 
     n_splits = 5
 
     n_total = -1
 
     max_features = 5000
-
-    print('\nRemoving empty files\n')
-
-    move_empty_files(corpus_path, empty_labels_path)  
 
     print('\nLoading Corpus\n')
 
@@ -50,7 +44,8 @@ if __name__ == '__main__':
 
     corpus_df_unique = corpus_df.drop_duplicates(subset='no_spacing')
 
-    corpus_df_unique['resume_nlp'] = corpus_df_unique['resume'].apply(lambda t: preprocessing(t)).astype(str)
+    corpus_df_unique['resume_nlp'] = corpus_df_unique['resume'].apply(
+        lambda t: preprocessing(t)).astype(str)
 
     resumes = corpus_df_unique['resume_nlp'].values
     labels = corpus_df_unique['label_unique'].values
@@ -67,7 +62,7 @@ if __name__ == '__main__':
 
     print(f'\nLabels distribution: {labels_distribution}')
 
-    for vectorizer_opt in ['binary', 'count', 'tf_idf']:
+    for vectorizer_opt in vectorizer_options:
 
         print(f'\n\nVectorizer: {vectorizer_opt}\n\n')
 
@@ -140,7 +135,8 @@ if __name__ == '__main__':
                 X_test = vectorizer.transform(X_test).toarray()
 
                 X_train, _, y_train, _ = train_test_split(
-                    X_train, y_train, test_size=0.1, stratify=y_train, shuffle=True, random_state=42)
+                    X_train, y_train, test_size=0.1, stratify=y_train, shuffle=True,
+                    random_state=42)
 
                 print(f'\n    Folder {k + 1} - {len(X_train)} - {len(X_test)}')
 
@@ -155,6 +151,4 @@ if __name__ == '__main__':
 
             compute_means_std_eval_measures(clf_name, all_y_test, all_y_pred, results_dict, results_dir)
 
-        import time
-
-        time.sleep(120)
+        time.sleep(60)
